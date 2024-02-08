@@ -98,25 +98,27 @@ config = load_dotenv(".env")
 HUGGINGFACEHUB_API_TOKEN = os.getenv('HUGGINGFACEHUB_API_TOKEN')
 S3_LOCATION = os.getenv("S3_LOCATION")
 
-try:
-    # Initialize an S3 client with unsigned configuration for public access
-    s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+# Define the FAISS index path
+FAISS_INDEX_PATH = './vectorstore/lc-faiss-multi-mpnet-500-markdown'
 
-    # Define the FAISS index path and the destination for the downloaded file
-    FAISS_INDEX_PATH = './vectorstore/lc-faiss-multi-mpnet-500-markdown'
-    VS_DESTINATION = FAISS_INDEX_PATH + ".zip"
+# try:
+#     # Initialize an S3 client with unsigned configuration for public access
+#     s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
 
-    # Download the pre-prepared vectorized index from the S3 bucket
-    print("Downloading the pre-prepared vectorized index from S3...")
-    s3.download_file(S3_LOCATION, 'vectorstores/lc-faiss-multi-mpnet-500-markdown.zip', VS_DESTINATION)
+#     Define the destination for the downloaded file
+#     VS_DESTINATION = FAISS_INDEX_PATH + ".zip"
 
-    # Extract the downloaded zip file
-    with zipfile.ZipFile(VS_DESTINATION, 'r') as zip_ref:
-        zip_ref.extractall('./vectorstore/')
-    print("Download and extraction completed.")
+#     # Download the pre-prepared vectorized index from the S3 bucket
+#     print("Downloading the pre-prepared vectorized index from S3...")
+#     s3.download_file(S3_LOCATION, 'vectorstores/lc-faiss-multi-mpnet-500-markdown.zip', VS_DESTINATION)
+
+#     # Extract the downloaded zip file
+#     with zipfile.ZipFile(VS_DESTINATION, 'r') as zip_ref:
+#         zip_ref.extractall('./vectorstore/')
+#     print("Download and extraction completed.")
     
-except Exception as e:
-    print(f"Error during downloading or extracting from S3: {e}", file=sys.stderr)
+# except Exception as e:
+#     print(f"Error during downloading or extracting from S3: {e}", file=sys.stderr)
 
 # Define the model name for embeddings
 model_name = "sentence-transformers/multi-qa-mpnet-base-dot-v1"
@@ -258,4 +260,5 @@ with gr.Blocks(css=css) as demo:
     clear.click(lambda: None, None, chatbot, queue=False)
 
 # Launch the Gradio demo interface
-demo.launch(share=False)
+if __name__ == "__main__":
+    demo.launch(share=False)

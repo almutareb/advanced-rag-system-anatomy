@@ -170,3 +170,4 @@ obj
 *.zip
 *.faiss
 *.pkl
+*.toml
