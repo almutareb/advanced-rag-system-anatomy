@@ -1,7 +1,7 @@
  langchain 
  langchain-community 
  beautifulsoup4 
- faiss-gpu 
+ faiss-cpu 
  chromadb 
  validators 
  sentence_transformers 
