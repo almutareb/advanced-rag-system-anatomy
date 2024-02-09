@@ -3,83 +3,15 @@ import sys
 import os
 import time
 
-# # Importing RecursiveUrlLoader for web scraping and BeautifulSoup for HTML parsing
-# from langchain.document_loaders.recursive_url_loader import RecursiveUrlLoader
-# from bs4 import BeautifulSoup as Soup
-# import mimetypes
+# Importing RecursiveUrlLoader for web scraping and BeautifulSoup for HTML parsing
+from langchain.document_loaders.recursive_url_loader import RecursiveUrlLoader
+from bs4 import BeautifulSoup as Soup
 
-# # List of URLs to scrape
-# urls = ["https://langchain-doc.readthedocs.io/en/latest"]
-
-# # Initialize an empty list to store the documents
-# docs = []
-
-# # Looping through each URL in the list - this could take some time!
-# stf = time.time()  # Start time for performance measurement
-# for url in urls:
-#     try:
-#         st = time.time()  # Start time for performance measurement
-#         # Create a RecursiveUrlLoader instance with a specified URL and depth
-#         # The extractor function uses BeautifulSoup to parse the HTML content and extract text
-#         loader = RecursiveUrlLoader(url=url, max_depth=5, extractor=lambda x: Soup(x, "html.parser").text)
-        
-#         # Load the documents from the URL and extend the docs list
-#         docs.extend(loader.load())
-
-#         et = time.time() - st  # Calculate time taken for splitting
-#         print(f'Time taken for downloading documents from {url}: {et} seconds.')
-#     except Exception as e:
-#         # Print an error message if there is an issue with loading or parsing the URL
-#         print(f"Failed to load or parse the URL {url}. Error: {e}", file=sys.stderr)
-# etf = time.time() - stf  # Calculate time taken for splitting
-# print(f'Total time taken for downloading {len(docs)} documents: {etf} seconds.')
-
-# # Import necessary modules for text splitting and vectorization
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# import time
-# from langchain_community.vectorstores import FAISS
-# from langchain.vectorstores.utils import filter_complex_metadata
-# from langchain_community.embeddings import HuggingFaceEmbeddings
-
-# # Configure the text splitter
-# text_splitter = RecursiveCharacterTextSplitter(
-#     separators=["\n\n", "\n", "(?<=\. )", " ", ""],  # Define the separators for splitting text
-#     chunk_size=500,  # The size of each text chunk
-#     chunk_overlap=50,  # Overlap between chunks to ensure continuity
-#     length_function=len,  # Function to determine the length of each chunk
-# )
-
-# try:
-#     # Stage one: Splitting the documents into chunks for vectorization
-#     st = time.time()  # Start time for performance measurement
-#     print('Loading documents and creating chunks ...')
-#     # Split each document into chunks using the configured text splitter
-#     chunks = text_splitter.create_documents([doc.page_content for doc in docs], metadatas=[doc.metadata for doc in docs])
-#     et = time.time() - st  # Calculate time taken for splitting
-#     print(f"created "+chunks+" chunks")
-#     print(f'Time taken for document chunking: {et} seconds.')
-# except Exception as e:
-#     print(f"Error during document chunking: {e}", file=sys.stderr)
-
-# # Path for saving the FAISS index
-# FAISS_INDEX_PATH = "./vectorstore/lc-faiss-multi-mpnet-500"
-
-# try:
-#     # Stage two: Vectorization of the document chunks
-#     model_name = "sentence-transformers/multi-qa-mpnet-base-dot-v1"  # Model used for embedding
-
-#     # Initialize HuggingFace embeddings with the specified model
-#     embeddings = HuggingFaceEmbeddings(model_name=model_name)
-
-#     print(f'Loading chunks into vector store ...')
-#     st = time.time()  # Start time for performance measurement
-#     # Create a FAISS vector store from the document chunks and save it locally
-#     db = FAISS.from_documents(filter_complex_metadata(chunks), embeddings)
-#     db.save_local(FAISS_INDEX_PATH)
-#     et = time.time() - st  # Calculate time taken for vectorization
-#     print(f'Time taken for vectorization and saving: {et} seconds.')
-# except Exception as e:
-#     print(f"Error during vectorization or FAISS index saving: {e}", file=sys.stderr)
+# Import necessary modules for text splitting and vectorization
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain.vectorstores.utils import filter_complex_metadata
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # alternatively download a preparaed vectorized index from S3 and load the index into vectorstore
 # Import necessary libraries for AWS S3 interaction, file handling, and FAISS vector stores
@@ -91,8 +23,101 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 
+# Import necessary modules for environment variable management and HuggingFace integration
+from langchain_community.llms import HuggingFaceHub
+
+# Importing necessary modules for retrieval-based question answering and prompt handling
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.memory import ConversationBufferMemory
+
+# Import Gradio for UI, along with other necessary libraries
+import gradio as gr
+
+#
+#######   LOADER    #######
+#
+# List of URLs to scrape
+
+urls = ["https://langchain-doc.readthedocs.io/en/latest"]
+
+# Initialize an empty list to store the documents
+docs = []
+
+# Looping through each URL in the list - this could take some time!
+stf = time.time()  # Start time for performance measurement
+for url in urls:
+    try:
+        st = time.time()  # Start time for performance measurement
+        # Create a RecursiveUrlLoader instance with a specified URL and depth
+        # The extractor function uses BeautifulSoup to parse the HTML content and extract text
+        loader = RecursiveUrlLoader(url=url, max_depth=3, extractor=lambda x: Soup(x, "html.parser").text)
+
+        # Load the documents from the URL and extend the docs list
+        docs.extend(loader.load())
+
+        et = time.time() - st  # Calculate time taken for splitting
+        print(f'Time taken for downloading documents from {url}: {et} seconds.')
+    except Exception as e:
+        # Print an error message if there is an issue with loading or parsing the URL
+        print(f"Failed to load or parse the URL {url}. Error: {e}", file=sys.stderr)
+etf = time.time() - stf  # Calculate time taken for splitting
+print(f'Total time taken for downloading {len(docs)} documents: {etf} seconds.')
+
+#
+#######   CHUNKING  #######
+#
+# Configure the text splitter
+
+text_splitter = RecursiveCharacterTextSplitter(
+    separators=["\n\n", "\n", "(?<=\. )", " ", ""],  # Define the separators for splitting text
+    chunk_size=500,  # The size of each text chunk
+    chunk_overlap=50,  # Overlap between chunks to ensure continuity
+    length_function=len,  # Function to determine the length of each chunk
+)
+
+try:
+    # Stage one: Splitting the documents into chunks for vectorization
+    st = time.time()  # Start time for performance measurement
+    print('Loading documents and creating chunks ...')
+    # Split each document into chunks using the configured text splitter
+    chunks = text_splitter.create_documents([doc.page_content for doc in docs],
+        metadatas=[doc.metadata for doc in docs])
+    et = time.time() - st  # Calculate time taken for splitting
+    print(f'created {len(chunks)} chunks')
+    print(f'Time taken for document chunking: {et} seconds.')
+except Exception as e:
+    print(f'Error during document chunking: {e}', file=sys.stderr)
+
+#
+#######   VECTORIZATION     #######
+#
+# Path for saving the FAISS index
+FAISS_INDEX_PATH = "./vectorstore/lc-faiss-multi-mpnet-500"
+
+try:
+    # Stage two: Vectorization of the document chunks
+    EMBEDDING_MODEL = "sentence-transformers/multi-qa-mpnet-base-dot-v1"  # Model used for embedding
+
+    # Initialize HuggingFace embeddings with the specified model
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+
+    print('Loading chunks into vector store ...')
+    st = time.time()  # Start time for performance measurement
+    # Create a FAISS vector store from the document chunks and save it locally
+    db = FAISS.from_documents(filter_complex_metadata(chunks), embeddings)
+    db.save_local(FAISS_INDEX_PATH)
+    et = time.time() - st  # Calculate time taken for vectorization
+    print(f'Time taken for vectorization and saving: {et} seconds.')
+except Exception as e:
+    print(f'Error during vectorization or FAISS index saving: {e}', file=sys.stderr)
+
+#
+#######   DOWNLOADING PREPROCESSED VECTORSTORE     #######
+#
+
 # Load environment variables from a .env file
-config = load_dotenv(".env")
+CONFIG = load_dotenv(".env")
 
 # Retrieve the Hugging Face API token from environment variables
 HUGGINGFACEHUB_API_TOKEN = os.getenv('HUGGINGFACEHUB_API_TOKEN')
@@ -101,40 +126,42 @@ S3_LOCATION = os.getenv("S3_LOCATION")
 # Define the FAISS index path
 FAISS_INDEX_PATH = './vectorstore/lc-faiss-multi-mpnet-500-markdown'
 
-# try:
-#     # Initialize an S3 client with unsigned configuration for public access
-#     s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+try:
+    # Initialize an S3 client with unsigned configuration for public access
+    s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
 
-#     Define the destination for the downloaded file
-#     VS_DESTINATION = FAISS_INDEX_PATH + ".zip"
+    #Define the destination for the downloaded file
+    VS_DESTINATION = FAISS_INDEX_PATH + ".zip"
 
-#     # Download the pre-prepared vectorized index from the S3 bucket
-#     print("Downloading the pre-prepared vectorized index from S3...")
-#     s3.download_file(S3_LOCATION, 'vectorstores/lc-faiss-multi-mpnet-500-markdown.zip', VS_DESTINATION)
-
-#     # Extract the downloaded zip file
-#     with zipfile.ZipFile(VS_DESTINATION, 'r') as zip_ref:
-#         zip_ref.extractall('./vectorstore/')
-#     print("Download and extraction completed.")
-    
-# except Exception as e:
-#     print(f"Error during downloading or extracting from S3: {e}", file=sys.stderr)
+    # Download the pre-prepared vectorized index from the S3 bucket
+    print('Downloading the pre-prepared vectorized index from S3...')
+    s3.download_file(
+        S3_LOCATION, 
+        'vectorstores/lc-faiss-multi-mpnet-500-markdown.zip', 
+        VS_DESTINATION)
+    # Extract the downloaded zip file
+    with zipfile.ZipFile(VS_DESTINATION, 'r') as zip_ref:
+        zip_ref.extractall('./vectorstore/')
+    print('Download and extraction completed.')
+except Exception as e:
+    print(f'Error during downloading or extracting from S3: {e}', file=sys.stderr)
 
 # Define the model name for embeddings
-model_name = "sentence-transformers/multi-qa-mpnet-base-dot-v1"
+EMBEDDING_MODEL = "sentence-transformers/multi-qa-mpnet-base-dot-v1"
 
 try:
     # Initialize HuggingFace embeddings with the specified model
-    embeddings = HuggingFaceEmbeddings(model_name=model_name)
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
     # Load the local FAISS index with the specified embeddings
     db = FAISS.load_local(FAISS_INDEX_PATH, embeddings)
-    print("FAISS index loaded successfully.")
+    print('FAISS index loaded successfully.')
 except Exception as e:
-    print(f"Error during FAISS index loading: {e}", file=sys.stderr)
+    print(f'Error during FAISS index loading: {e}', file=sys.stderr)
 
-# Import necessary modules for environment variable management and HuggingFace integration
-from langchain_community.llms import HuggingFaceHub
+#
+#######   LOADING MODEL     #######
+#
 
 # Initialize the vector store as a retriever for the RAG pipeline
 retriever = db.as_retriever()
@@ -142,27 +169,25 @@ retriever = db.as_retriever()
 try:
     # Load the model from the Hugging Face Hub
     model_id = HuggingFaceHub(repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1", model_kwargs={
-        "temperature": 0.1,         # Controls randomness in response generation (lower value means less random)
+        "temperature": 0.1,         # Controls randomness in response generation
         "max_new_tokens": 1024,     # Maximum number of new tokens to generate in responses
-        "repetition_penalty": 1.2,  # Penalty for repeating the same words (higher value increases penalty)
-        "return_full_text": False   # If False, only the newly generated text is returned; if True, the input is included as well
+        "repetition_penalty": 1.2,  # Penalty for repeating the same words
+        "return_full_text": False   # If True, the input is included as well
     })
-    print("Model loaded successfully from Hugging Face Hub.")
+    print('Model loaded successfully from Hugging Face Hub.')
 except Exception as e:
-    print(f"Error loading model from Hugging Face Hub: {e}", file=sys.stderr)
+    print(f'Error loading model from Hugging Face Hub: {e}', file=sys.stderr)
 
 
-
-# Importing necessary modules for retrieval-based question answering and prompt handling
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
+#
+#######   PROMPT TEMPLATE & CHAT LOGIC     #######
+#
 
 # Declare a global variable 'qa' for the retrieval-based question answering system
-global qa
+#global qa
 
 # Define a prompt template for guiding the model's responses
-template = """
+QA_TEMPLATE = """
 You are the friendly documentation buddy Arti, if you don't know the answer say 'I don't know' and don't make things up.\
     Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question :
 ------
@@ -180,8 +205,7 @@ Answer:
 
 # Create a PromptTemplate object with specified input variables and the defined template
 prompt = PromptTemplate.from_template(
-    #input_variables=["history", "context", "question"],  # Variables to be included in the prompt
-    template=template,  # The prompt template as defined above
+    template=QA_TEMPLATE,  # The prompt template as defined above
 )
 prompt.format(context="context", history="history", question="question")
 # Create a memory buffer to manage conversation history
@@ -190,7 +214,8 @@ memory = ConversationBufferMemory(
     input_key="question"  # Key for the input question
 )
 
-# Initialize the RetrievalQA object with the specified model, retriever, and additional configurations
+# Initialize the RetrievalQA object with the specified model,
+# retriever, and additional configurations
 qa = RetrievalQA.from_chain_type(
     llm=model_id,  # Language model loaded from Hugging Face Hub
     retriever=retriever,  # The vector store retriever initialized earlier
@@ -202,10 +227,10 @@ qa = RetrievalQA.from_chain_type(
     }
 )
 
-# Import Gradio for UI, along with other necessary libraries
-import gradio as gr
-import random
-import time
+
+#
+#######   CHAT UI     #######
+#
 
 # Function to add a new input to the chat history
 def add_text(history, text):
@@ -228,12 +253,12 @@ def infer(question, history):
     return result
 
 # CSS styling for the Gradio interface
-css = """
+CSS = """
 #col-container {max-width: 700px; margin-left: auto; margin-right: auto;}
 """
 
 # HTML content for the Gradio interface title
-title = """
+TITLE = """
 <div style="text-align: center;max-width: 700px;">
     <h1>Chat with your Documentation</h1>
     <p style="text-align: center;">Chat with LangChain Documentation, <br />
@@ -242,9 +267,9 @@ title = """
 """
 
 # Building the Gradio interface
-with gr.Blocks(css=css) as demo:
+with gr.Blocks(css=CSS) as demo:
     with gr.Column(elem_id="col-container"):
-        gr.HTML(title)  # Add the HTML title to the interface
+        gr.HTML(TITLE)  # Add the HTML title to the interface
         chatbot = gr.Chatbot([], elem_id="chatbot")  # Initialize the chatbot component
         clear = gr.Button("Clear")  # Add a button to clear the chat
 
