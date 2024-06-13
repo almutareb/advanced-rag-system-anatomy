@@ -1,11 +1,12 @@
  langchain 
  langchain-community 
+ langchain_huggingface
  beautifulsoup4 
  faiss-cpu 
  chromadb 
  validators 
  sentence_transformers 
- typing-extensions==4.8.0 
+ typing-extensions
  unstructured 
- gradio==3.48.0
+ gradio
  boto3

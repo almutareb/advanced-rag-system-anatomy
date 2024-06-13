@@ -88,7 +88,7 @@ from botocore import UNSIGNED
 from botocore.client import Config
 import zipfile
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 
 # Load environment variables from a .env file
@@ -126,25 +126,25 @@ try:
     embeddings = HuggingFaceEmbeddings(model_name=model_name)
 
     # Load the local FAISS index with the specified embeddings
-    db = FAISS.load_local(FAISS_INDEX_PATH, embeddings)
+    db = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
     print("FAISS index loaded successfully.")
 except Exception as e:
     print(f"Error during FAISS index loading: {e}", file=sys.stderr)
 
 # Import necessary modules for environment variable management and HuggingFace integration
-from langchain_community.llms import HuggingFaceHub
+from langchain_huggingface import HuggingFaceEndpoint
 
 # Initialize the vector store as a retriever for the RAG pipeline
-retriever = db.as_retriever()
+retriever = db.as_retriever(search_type="mmr", search_kwargs={'k': 3, 'lambda_mult': 0.25})
 
 try:
     # Load the model from the Hugging Face Hub
-    model_id = HuggingFaceHub(repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1", model_kwargs={
-        "temperature": 0.1,         # Controls randomness in response generation (lower value means less random)
-        "max_new_tokens": 1024,     # Maximum number of new tokens to generate in responses
-        "repetition_penalty": 1.2,  # Penalty for repeating the same words (higher value increases penalty)
-        "return_full_text": False   # If False, only the newly generated text is returned; if True, the input is included as well
-    })
+    model_id = HuggingFaceEndpoint(repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1", 
+        temperature=0.1,         # Controls randomness in response generation (lower value means less random)
+        max_new_tokens=1024,     # Maximum number of new tokens to generate in responses
+        repetition_penalty=1.2,  # Penalty for repeating the same words (higher value increases penalty)
+        return_full_text=False   # If False, only the newly generated text is returned; if True, the input is included as well
+    )
     print("Model loaded successfully from Hugging Face Hub.")
 except Exception as e:
     print(f"Error loading model from Hugging Face Hub: {e}", file=sys.stderr)
@@ -215,8 +215,14 @@ def add_text(history, text):
 def bot(history):
     # Obtain the response from the 'infer' function using the latest input
     response = infer(history[-1][0], history)
+    sources = [doc.metadata.get("source") for doc in response['source_documents']]
+    src_list = '\n'.join(sources)
+    print_this = response['result'] + "\n\n\n Sources: \n\n\n" + src_list
+
+
+    history[-1][1] = print_this #response['answer']
     # Update the history with the bot's response
-    history[-1][1] = response['result']
+    #history[-1][1] = response['result']
     return history
 
 # Function to infer the response using the RAG model
